@@ -31,6 +31,7 @@ def _resource_dict(resource) -> dict:
         "pan_type": resource.pan_type,
         "channel": resource.channel,
         "source_ref": resource.source_ref,
+        "pan_branches": resource.pan_branches,
         "updated_at": resource.updated_at,
     }
 

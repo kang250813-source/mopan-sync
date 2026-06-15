@@ -46,6 +46,25 @@ BUNDLE_RE = re.compile(
 SHARE_ID_RE = re.compile(r"/s/([a-f0-9]+)", re.IGNORECASE)
 
 
+from transfer.quark_share import folder_fid_from_source_ref, list_folder_names
+
+
+def attach_pan_branches(entries: list[dict]) -> None:
+    cache: dict[tuple[str, str | None], list[str]] = {}
+    for entry in entries:
+        url = entry.get("pan_url", "").split("?")[0].strip()
+        if not url:
+            continue
+        fid = folder_fid_from_source_ref(entry.get("source_ref"))
+        key = (url, fid)
+        if key not in cache:
+            try:
+                cache[key] = list_folder_names(url, folder_fid=fid)
+            except Exception:
+                cache[key] = []
+        entry["pan_branches"] = cache[key]
+
+
 def load_config() -> dict:
     with (ROOT / "config.yaml").open(encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -150,11 +169,16 @@ def main() -> int:
         all_entries.extend(entries)
 
     if args.dry_run:
+        attach_pan_branches(all_entries)
         for entry in all_entries[:10]:
-            print(f"  - [{entry['category']}] {entry['title'][:50]}")
+            branches = entry.get("pan_branches") or []
+            hint = f" · {len(branches)} 分支" if branches else ""
+            print(f"  - [{entry['category']}] {entry['title'][:50]}{hint}")
         if len(all_entries) > 10:
             print(f"  ... and {len(all_entries) - 10} more")
         return 0
+
+    attach_pan_branches(all_entries)
 
     sys.path.insert(0, str(site_root))
     from app.database import init_db, upsert_resource  # noqa: WPS433
@@ -172,6 +196,7 @@ def main() -> int:
             link_status="own",
             channel="k12",
             source_ref=entry["source_ref"],
+            pan_branches=entry.get("pan_branches"),
         )
         stats[result] += 1
 

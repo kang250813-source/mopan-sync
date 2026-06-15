@@ -51,6 +51,23 @@ BUNDLE_RE = re.compile(
 SHARE_ID_RE = re.compile(r"/s/([a-f0-9]+)", re.IGNORECASE)
 
 
+from transfer.quark_share import list_folder_names
+
+
+def attach_pan_branches(entries: list[dict]) -> None:
+    cache: dict[str, list[str]] = {}
+    for entry in entries:
+        url = entry.get("pan_url", "").split("?")[0].strip()
+        if not url:
+            continue
+        if url not in cache:
+            try:
+                cache[url] = list_folder_names(url)
+            except Exception:
+                cache[url] = []
+        entry["pan_branches"] = cache[url]
+
+
 def load_config() -> dict:
     with (ROOT / "config.yaml").open(encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -149,9 +166,13 @@ def main() -> int:
     entries = parse_entries(md, include_all=args.all)
     print(f"parsed {len(entries)} AI entries")
 
+    attach_pan_branches(entries)
+
     if args.dry_run:
         for entry in entries[:12]:
-            print(f"  - [{entry['category']}] {entry['title'][:55]}")
+            branches = entry.get("pan_branches") or []
+            hint = f" · {len(branches)} 分支" if branches else ""
+            print(f"  - [{entry['category']}] {entry['title'][:55]}{hint}")
         if len(entries) > 12:
             print(f"  ... and {len(entries) - 12} more")
         return 0
@@ -172,6 +193,7 @@ def main() -> int:
             link_status="own",
             channel="ai_video",
             source_ref=entry["source_ref"],
+            pan_branches=entry.get("pan_branches"),
         )
         stats[result] += 1
 

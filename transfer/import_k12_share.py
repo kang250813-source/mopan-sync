@@ -81,6 +81,9 @@ def list_share_dir(
     return items
 
 
+from transfer.quark_share import folder_fid_from_source_ref, list_folder_names
+
+
 def normalize_title(name: str) -> str:
     title = name.strip()
     title = re.sub(r"[（(]点击保存立即查看[）)]", "", title).strip()
@@ -91,6 +94,19 @@ def normalize_title(name: str) -> str:
         rest = title[7:].lstrip()
         return f"Scratch {rest}" if rest else "Scratch"
     return title
+
+
+def attach_pan_branches(entries: list[dict], pan_url: str) -> None:
+    cache: dict[tuple[str, str | None], list[str]] = {}
+    for entry in entries:
+        fid = folder_fid_from_source_ref(entry.get("source_ref"))
+        key = (pan_url, fid)
+        if key not in cache:
+            try:
+                cache[key] = list_folder_names(pan_url, folder_fid=fid)
+            except Exception:
+                cache[key] = []
+        entry["pan_branches"] = cache[key]
 
 
 def collect_entries(share_url: str) -> list[dict]:
@@ -161,11 +177,14 @@ def main() -> int:
     published_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     entries = collect_entries(args.share_url)
+    attach_pan_branches(entries, pan_url)
     print(f"准备导入 {len(entries)} 条到 K12 频道\n")
 
     if args.dry_run:
         for entry in entries:
-            print(f"- {entry['title']} ({entry['category']})")
+            branches = entry.get("pan_branches") or []
+            hint = f" · {len(branches)} 分支" if branches else ""
+            print(f"- {entry['title']} ({entry['category']}){hint}")
         return 0
 
     sys.path.insert(0, str(site_root))
@@ -184,6 +203,7 @@ def main() -> int:
             link_status="own",
             channel="k12",
             source_ref=entry["source_ref"],
+            pan_branches=entry.get("pan_branches"),
         )
         stats[result] += 1
         print(f"  {result}: {entry['title']}")
