@@ -3,4 +3,5 @@ __pycache__/
 *.pyc
 data/*.db
 data/*.json
+!data/discover_sync_state.json
 *.log

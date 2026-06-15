@@ -36,6 +36,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Import articles with content to mopan-site")
     parser.add_argument("--config", default=str(ROOT / "config.yaml"))
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=0,
+        help="Only import articles modified within the last N days (0 = all)",
+    )
+    parser.add_argument(
+        "--since",
+        default="",
+        help="Only import articles with modified_at >= this ISO timestamp",
+    )
     args = parser.parse_args()
 
     config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
@@ -50,10 +61,18 @@ def main() -> int:
 
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    sql = "SELECT * FROM articles ORDER BY published_at DESC"
+    sql = "SELECT * FROM articles"
+    params: list[str] = []
+    if args.since:
+        sql += " WHERE modified_at >= ?"
+        params.append(args.since)
+    elif args.days > 0:
+        sql += " WHERE modified_at >= datetime('now', ?)"
+        params.append(f"-{args.days} days")
+    sql += " ORDER BY published_at DESC"
     if args.limit > 0:
         sql += f" LIMIT {args.limit}"
-    rows = conn.execute(sql).fetchall()
+    rows = conn.execute(sql, params).fetchall()
 
     stats = {"inserted": 0, "updated": 0}
     for row in rows:

@@ -69,3 +69,20 @@ docker compose up -d
 cd ~/mopan-site && ./run.sh
 # http://localhost:8083
 ```
+
+## 发现频道 · 每日同步
+
+从 ahhhhfs 增量抓取 → 导入魔盘发现频道 → 导出 JSON → 构建 GitHub Pages → 推送。
+
+```bash
+# 手动同步并推送 GitHub
+./scripts/daily_discover_sync.sh
+
+# 安装本地 crontab（每天 06:00）
+./scripts/install_daily_cron.sh
+
+# 仅导出 discover.json（不构建）
+./scripts/export_discover.sh
+```
+
+GitHub Actions 在 `mopan-site` 仓库每天 06:00（北京时间）自动执行同样流程。
