@@ -1,0 +1,12 @@
+services:
+  mopan-quark-auto-save:
+    image: cp0204/quark-auto-save:latest
+    container_name: mopan-quark-auto-save
+    restart: unless-stopped
+    ports:
+      - "5006:5005"
+    environment:
+      WEBUI_USERNAME: admin
+      WEBUI_PASSWORD: admin123
+    volumes:
+      - ./qas/config:/app/config

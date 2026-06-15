@@ -1,0 +1,55 @@
+source:
+  name: ahhhhfs
+  base_url: "https://www.ahhhhfs.com"
+  api_base: "https://www.ahhhhfs.com/wp-json/wp/v2"
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+  request_delay_seconds: 1.2
+  per_page: 100
+  max_retries: 5
+  after: "2025-06-14T00:00:00"
+
+database:
+  path: "data/ahhhhfs.db"
+
+# 魔盘只用第一个夸克网盘（main），与剧盘 duanjuku-sync 主盘共用 Cookie/QAS
+# 不要用 ~/duanjuku-instances/kuake2 等第二个盘
+pan:
+  type: quark
+  account: main
+  save_path_prefix: "/魔盘"
+  classics_prefix: "/魔盘/古典藏书"
+  qas_config: "~/duanjuku-sync/qas/config/quark_config.json"
+  qas_url: "http://localhost:5005"
+
+classics:
+  github_user: kang250813-source   # mirror from wenyuange
+  upstream_user: wenyuange
+  clone_dir: "~/mopan-data/classics"
+  mode: preview          # preview = 摘录+GitHub；full = 全文站内
+  preview_chars: 800
+  repos:
+    - ru
+    - poem
+    - dao
+    - fo
+    - zi
+    - yi
+    - ji
+    - history
+    - medicine
+    - art
+  branch: master
+
+# 可选：独立 QAS 容器（默认不用，直接走主盘 5005）
+quark:
+  save_path_prefix: "/魔盘"
+  qas_config_path: "qas/config/quark_config.json"
+  share_cache_path: "data/mopan_share_links.json"
+  qas_port: 5005
+  pattern: ".*"
+  replace: ""
+  enddate: "2099-12-31"
+
+site:
+  root: "~/mopan-site"
+  port: 8083
