@@ -97,7 +97,7 @@ def parse_catalog(md: str, catalog: str) -> list[dict]:
                 {
                     "title": meta["bundle_title"],
                     "category": meta["bundle_category"],
-                    "excerpt": f"小赵资源站 · {meta['bundle_title']}，一键打开全部子目录。",
+                    "excerpt": f"{meta['bundle_title']}，一键打开全部子目录。",
                     "pan_url": url,
                     "source_ref": f"{meta['source_prefix']}/bundle/{share_id.group(1)}",
                 }
@@ -116,7 +116,7 @@ def parse_catalog(md: str, catalog: str) -> list[dict]:
             {
                 "title": title,
                 "category": category,
-                "excerpt": f"夸克网盘 · {category} · 来源小赵资源站（kuake.netlify.app）",
+                "excerpt": f"夸克网盘 · {category}",
                 "pan_url": url,
                 "source_ref": f"{meta['source_prefix']}/{share_id.group(1)}",
             }

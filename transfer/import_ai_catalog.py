@@ -104,7 +104,7 @@ def parse_entries(md: str, *, include_all: bool = False) -> list[dict]:
                 {
                     "title": "编程开发与AI全套合集",
                     "category": "AI合集",
-                    "excerpt": "小赵资源站 · 编程开发与 AI 全部资源汇总，含 DeepSeek、AIGC、AI 办公与绘画等。",
+                    "excerpt": "编程开发与 AI 资源汇总，含 DeepSeek、AIGC、AI 办公与绘画等。",
                     "pan_url": url,
                     "source_ref": f"ai_video/zhao/bundle/{share_id.group(1)}",
                 }
@@ -125,7 +125,7 @@ def parse_entries(md: str, *, include_all: bool = False) -> list[dict]:
             {
                 "title": title,
                 "category": category,
-                "excerpt": f"夸克网盘 · {category} · 来源小赵资源站（kuake.netlify.app）",
+                "excerpt": f"夸克网盘 · {category}",
                 "pan_url": url,
                 "source_ref": f"ai_video/zhao/{share_id.group(1)}",
             }
