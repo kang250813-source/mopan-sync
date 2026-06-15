@@ -39,13 +39,14 @@ echo "==> [2/5] 导入发现频道（近 ${IMPORT_DAYS} 天修订）..."
 .venv/bin/python transfer/import_articles.py --days "$IMPORT_DAYS"
 
 echo ""
-echo "==> [3/5] 导出 discover.json..."
-.venv/bin/python transfer/export_discover.py
+echo "==> [3/6] 导出全站数据（发现/K12/AI/藏书/短剧）..."
+.venv/bin/python transfer/export_site_data.py
 
 echo ""
-echo "==> [4/5] 构建 GitHub Pages 静态站..."
+echo "==> [4/6] 构建 GitHub Pages 静态站（全频道）..."
 BASE_PATH="$BASE_PATH" "$SITE_ROOT/.venv/bin/python" "$SITE_ROOT/scripts/build_static.py"
 
+echo "==> [5/6] 记录同步状态..."
 now_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 python3 - <<PY
 import json
@@ -66,7 +67,7 @@ if [[ "$PUSH_GITHUB" != "1" ]]; then
 fi
 
 echo ""
-echo "==> [5/5] 提交并推送 GitHub..."
+echo "==> [6/6] 提交并推送 GitHub..."
 
 push_repo() {
   local repo_path="$1"
@@ -86,7 +87,7 @@ push_repo() {
   echo "  $(basename "$repo_path"): 已推送"
 }
 
-push_repo "$SITE_ROOT" "chore: daily discover sync ${now_iso:0:10}"
+push_repo "$SITE_ROOT" "chore: daily site sync ${now_iso:0:10}"
 push_repo "$ROOT" "chore: daily discover crawl ${now_iso:0:10}"
 
 echo ""
