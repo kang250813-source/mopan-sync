@@ -155,7 +155,8 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    catalogs = args.catalog or list(CATALOGS)
+    # K12 仅收录学生教育；职业考试/职场提升见 career-development，勿混入本频道
+    catalogs = args.catalog or ["student-education"]
     config = load_config()
     site_root = Path(config["site"]["root"]).expanduser()
     pan_type = config.get("pan", {}).get("type", "quark")
