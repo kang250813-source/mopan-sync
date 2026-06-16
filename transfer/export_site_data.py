@@ -85,29 +85,76 @@ def main() -> int:
         channel_counts[channel] = len(rows)
         print(f"  {channel}: {len(rows)}")
 
-    dramas = jupan_bridge.list_dramas(limit=10_000, offset=0)
-    channel_counts["drama"] = len(dramas)
-    print(f"  drama: {len(dramas)}")
+    drama_total = jupan_bridge.count_dramas()
+    dramas = jupan_bridge.list_dramas(limit=max(drama_total, 1), offset=0)
+    channel_counts["drama"] = drama_total
+    print(f"  drama: {drama_total}")
 
-    payload = {
-        "exported_at": datetime.now(timezone.utc).isoformat(),
-        "channel_counts": channel_counts,
-        "channels": channels,
-        "dramas": [_drama_dict(d) for d in dramas],
-    }
-
+    exported_at = datetime.now(timezone.utc).isoformat()
     out_dir = site_root / "data"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    export_path = out_dir / "site_export.json"
-    export_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    export_dir = out_dir / "export"
+    export_dir.mkdir(parents=True, exist_ok=True)
+
+    for channel in resource_channels:
+        channel_path = export_dir / f"{channel}.json"
+        channel_path.write_text(
+            json.dumps(
+                {
+                    "exported_at": exported_at,
+                    "channel": channel,
+                    "total": channel_counts[channel],
+                    "category_counts": channels[channel]["category_counts"],
+                    "resources": channels[channel]["resources"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    drama_path = export_dir / "drama.json"
+    drama_path.write_text(
+        json.dumps(
+            {
+                "exported_at": exported_at,
+                "channel": "drama",
+                "total": drama_total,
+                "dramas": [_drama_dict(d) for d in dramas],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    manifest_path = export_dir / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "exported_at": exported_at,
+                "channel_counts": channel_counts,
+                "files": {
+                    **{ch: f"{ch}.json" for ch in resource_channels},
+                    "drama": "drama.json",
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     meta_path = out_dir / "sync_meta.json"
     meta_path.write_text(
         json.dumps(
             {
-                "last_export": payload["exported_at"],
+                "last_export": exported_at,
                 "channel_counts": channel_counts,
                 "source": "mopan-site + duanjuku-site",
+                "export_dir": "data/export",
             },
             ensure_ascii=False,
             indent=2,
@@ -121,7 +168,7 @@ def main() -> int:
     discover_path.write_text(
         json.dumps(
             {
-                "exported_at": payload["exported_at"],
+                "exported_at": exported_at,
                 "channel": "discover",
                 "total": channel_counts.get("discover", 0),
                 "category_counts": channels["discover"]["category_counts"],
@@ -142,7 +189,7 @@ def main() -> int:
         cover_count = sum(1 for _ in covers_dst.iterdir() if _.is_file())
         print(f"  covers: {cover_count} -> {covers_dst}")
 
-    print(f"exported -> {export_path}")
+    print(f"exported -> {export_dir}/ (manifest + {len(resource_channels) + 1} channel files)")
     return 0
 
 
