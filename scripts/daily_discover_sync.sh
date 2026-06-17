@@ -7,7 +7,7 @@ SITE_ROOT="${SITE_ROOT:-$HOME/mopan-site}"
 CRAWL_DAYS="${CRAWL_DAYS:-14}"
 IMPORT_DAYS="${IMPORT_DAYS:-14}"
 PUSH_GITHUB="${PUSH_GITHUB:-1}"
-BASE_PATH="${BASE_PATH:-/mopan-site}"
+BASE_PATH="${BASE_PATH:-/}"
 
 cd "$ROOT"
 if [[ ! -d .venv ]]; then

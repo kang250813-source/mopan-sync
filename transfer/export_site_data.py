@@ -44,6 +44,7 @@ def _drama_dict(drama) -> dict:
         "published_at": drama.published_at,
         "cover_url": drama.cover_url,
         "tags": list(drama.tags or []),
+        "pan_source": getattr(drama, "pan_source", "main"),
     }
 
 

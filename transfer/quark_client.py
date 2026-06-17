@@ -31,13 +31,17 @@ class QuarkClient:
             "user-agent": USER_AGENT,
         }
 
+    def _http(self, timeout: float = 30.0) -> httpx.Client:
+        # 夸克 API 走直连，避免本地代理导致 SSL 中断
+        return httpx.Client(timeout=timeout, trust_env=False)
+
     def _check(self, payload: dict[str, Any], context: str) -> dict[str, Any]:
         if payload.get("code") != 0:
             raise QuarkError(f"{context}: {payload.get('message') or payload}")
         return payload["data"]
 
     def get_account_info(self) -> dict[str, Any]:
-        with httpx.Client(timeout=30.0) as client:
+        with self._http() as client:
             resp = client.get(
                 "https://pan.quark.cn/account/info",
                 params={"fr": "pc", "platform": "pc"},
@@ -49,7 +53,7 @@ class QuarkClient:
         return payload["data"]
 
     def get_fid_by_path(self, file_path: str) -> str | None:
-        with httpx.Client(timeout=30.0) as client:
+        with self._http() as client:
             resp = client.post(
                 f"{BASE_URL}/1/clouddrive/file/info/path_list",
                 params=DEFAULT_PARAMS,
@@ -68,7 +72,7 @@ class QuarkClient:
         items: list[dict[str, Any]] = []
         page = 1
         total = None
-        with httpx.Client(timeout=30.0) as client:
+        with self._http() as client:
             while True:
                 resp = client.get(
                     f"{BASE_URL}/1/clouddrive/file/sort",
@@ -98,6 +102,60 @@ class QuarkClient:
                 page += 1
         return items
 
+    def create_folder(self, name: str, pdir_fid: str = "0") -> str:
+        with self._http() as client:
+            resp = client.post(
+                f"{BASE_URL}/1/clouddrive/file",
+                params=DEFAULT_PARAMS,
+                headers=self.headers,
+                json={
+                    "pdir_fid": pdir_fid,
+                    "file_name": name,
+                    "dir_path": "",
+                    "dir_init_lock": False,
+                },
+            )
+        payload = resp.json()
+        data = self._check(payload, f"创建文件夹失败 {name}")
+        fid = data.get("fid")
+        if not fid:
+            raise QuarkError(f"创建文件夹未返回 fid: {name}")
+        return fid
+
+    def ensure_folder_path(self, path: str) -> str:
+        """Ensure nested folders exist; return fid of the deepest folder."""
+        parts = [p for p in path.strip("/").split("/") if p]
+        if not parts:
+            return "0"
+        parent = "0"
+        for part in parts:
+            existing = None
+            for item in self.list_dir(parent):
+                if item.get("file_type") == 0 and item.get("file_name") == part:
+                    existing = item["fid"]
+                    break
+            parent = existing or self.create_folder(part, parent)
+        return parent
+
+    def move_files(self, fids: list[str], to_pdir_fid: str) -> None:
+        if not fids:
+            return
+        with self._http(60.0) as client:
+            resp = client.post(
+                f"{BASE_URL}/1/clouddrive/file/move",
+                params=DEFAULT_PARAMS,
+                headers=self.headers,
+                json={
+                    "action_type": 1,
+                    "filelist": fids,
+                    "to_pdir_fid": to_pdir_fid,
+                    "exclude_fids": [],
+                },
+            )
+        payload = resp.json()
+        self._check(payload, "移动文件失败")
+        time.sleep(0.8)
+
     def create_share_link(
         self,
         fid: str,
@@ -106,7 +164,7 @@ class QuarkClient:
         url_type: int = 1,
         expired_type: int = 1,
     ) -> str:
-        with httpx.Client(timeout=60.0) as client:
+        with self._http(60.0) as client:
             resp = client.post(
                 f"{BASE_URL}/1/clouddrive/share",
                 params=DEFAULT_PARAMS,

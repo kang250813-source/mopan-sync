@@ -1,8 +1,22 @@
 # 魔盘 · 本地同步（mopan-sync）
 
-从 **ahhhhfs.com** 抓取近一年文章与资源链接，存入本地 SQLite，供后续魔盘站点使用。
+从 **ahhhhfs.com** 抓取近一年文章与资源链接，存入本地 SQLite，供 **魔盘（www.mopan.lol）** 使用。
 
-> 独立项目，与 `duanjuku-sync` / 剧盘无关。
+> **与剧盘（www.jupan.lol / duanjuku-sync）完全独立。** 勿在本项目推 `jupan-pages`。
+
+## 剧盘 vs 魔盘
+
+| | **剧盘 jupan** | **魔盘 mopan（本项目）** |
+|---|----------------|-------------------------|
+| 网站 | www.jupan.lol | **www.mopan.lol** |
+| 同步仓库 | `~/duanjuku-sync` | **`~/mopan-sync`** |
+| 站点 | `~/duanjuku-site` | **`~/mopan-site`** |
+| 夸克网盘 | **jupan001**（第二盘） | **main**（主盘）· `/魔盘` |
+| GitHub | `jupan-pages` | **`mopan-site`** |
+
+短剧批量（rbsou 等）在 `duanjuku-sync/scripts/drama_batch_publish.sh` 跑，但归属魔盘：只转存 **main**，只 push **mopan-site**。
+
+详见 `~/duanjuku-sync/README.md`。
 
 ## 快速开始
 

@@ -53,3 +53,9 @@ quark:
 site:
   root: "~/mopan-site"
   port: 8083
+
+# LINUX DO 网盘资源 RSS（原链索引，不转存小怪盘）
+linuxdo:
+  rss_url: "https://linux.do/c/resource/cloud-asset/94.rss"
+  data_path: "data/linuxdo_topics.json"
+  page_delay_seconds: 12
