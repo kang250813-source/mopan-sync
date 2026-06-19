@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -54,7 +55,7 @@ def main() -> int:
     args = parser.parse_args()
 
     config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
-    site_root = Path(config["site"]["root"]).expanduser()
+    site_root = Path(os.environ.get("SITE_ROOT") or config["site"]["root"]).expanduser()
     sys.path.insert(0, str(site_root))
 
     from app import jupan_bridge  # noqa: WPS433
@@ -69,7 +70,7 @@ def main() -> int:
     db_path = site_root / "data" / "site.db"
     init_db(db_path)
 
-    resource_channels = ("discover", "k12", "ai_video", "classics")
+    resource_channels = ("discover", "media", "other", "k12", "ai_video", "classics")
     channels: dict[str, dict] = {}
     channel_counts: dict[str, int] = {}
 

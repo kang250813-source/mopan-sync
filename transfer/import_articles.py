@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -51,7 +52,7 @@ def main() -> int:
 
     config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
     db_path = ROOT / config["database"]["path"]
-    site_root = Path(config["site"]["root"]).expanduser()
+    site_root = Path(os.environ.get("SITE_ROOT") or config["site"]["root"]).expanduser()
     pan_type = config.get("pan", {}).get("type", "quark")
 
     sys.path.insert(0, str(site_root))
