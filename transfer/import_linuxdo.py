@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from transfer.linuxdo_classify import classify_topic
+
 
 def load_config() -> dict:
     with (ROOT / "config.yaml").open(encoding="utf-8") as f:
@@ -39,6 +41,11 @@ def main() -> int:
     site_root = Path(config["site"]["root"]).expanduser()
     payload = json.loads(in_path.read_text(encoding="utf-8"))
     topics = list(payload.get("topics") or [])
+    for row in topics:
+        channel, category = classify_topic(title=row.get("title", ""), description="")
+        row["channel"] = channel
+        row["category"] = category
+        row["eligible"] = bool(row.get("pan_url")) and channel is not None
 
     if not args.all:
         topics = [t for t in topics if t.get("eligible")]
@@ -66,7 +73,9 @@ def main() -> int:
 
     for row in topics:
         channel = row.get("channel") or "discover"
-        excerpt = f"来源 LINUX DO 社区网盘资源，{row.get('pan_type', 'quark')} 直链。"
+        if not args.all and not (row.get("pan_url") and row.get("channel")):
+            continue
+        excerpt = ""
         result = upsert_resource(
             title=row["title"],
             pan_url=row["pan_url"],

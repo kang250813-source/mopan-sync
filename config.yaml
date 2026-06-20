@@ -59,3 +59,11 @@ linuxdo:
   rss_url: "https://linux.do/c/resource/cloud-asset/94.rss"
   data_path: "data/linuxdo_topics.json"
   page_delay_seconds: 12
+  max_age_days: 730   # 只抓/保留近两年
+
+# ahhhhfs 本地收件箱（每日抓取浏览，手动 import 上站）
+ahhhhfs:
+  inbox_days: 30
+  inbox_json: "data/ahhhhfs_inbox.json"
+  inbox_md: "data/ahhhhfs_inbox.md"
+  crawl_days: 7

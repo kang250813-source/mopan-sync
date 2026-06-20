@@ -84,19 +84,31 @@ cd ~/mopan-site && ./run.sh
 # http://localhost:8083
 ```
 
-## 发现频道 · 每日同步
+## 每日全站同步（10:00）
 
-从 ahhhhfs 增量抓取 → 导入魔盘发现频道 → 导出 JSON → 构建 GitHub Pages → 推送。
+ahhhhfs 增量抓取 → 导入发现频道 → LINUX DO 抓取导入 → 导出全站数据 → 构建静态站 → git push。
 
 ```bash
 # 手动同步并推送 GitHub
-./scripts/daily_discover_sync.sh
+./scripts/daily_site_sync.sh
 
-# 安装本地 crontab（每天 06:00）
-./scripts/install_daily_cron.sh
+# 安装本地 crontab（每天 10:00）
+./scripts/install_daily_site_sync_cron.sh
+
+# 仅本地试跑，不推送
+PUSH_GITHUB=0 ./scripts/daily_site_sync.sh
 
 # 仅导出 discover.json（不构建）
 ./scripts/export_discover.sh
 ```
 
-GitHub Actions 在 `mopan-site` 仓库每天 06:00（北京时间）自动执行同样流程。
+| 环境变量 | 默认 | 说明 |
+|----------|------|------|
+| `CRAWL_DAYS` | 14 | ahhhhfs 增量抓取天数 |
+| `IMPORT_DAYS` | 14 | ahhhhfs 导入天数 |
+| `LINUXDO_PAGES` | 5 | LINUX DO RSS 翻页数 |
+| `PUSH_GITHUB` | 1 | 0=不推送 |
+
+日志：`logs/daily_site_sync.log`
+
+GitHub Actions（`mopan-site` 仓库）每天 10:00（北京时间）作为备用同步；本机 cron 为主（含完整 `site.db`）。

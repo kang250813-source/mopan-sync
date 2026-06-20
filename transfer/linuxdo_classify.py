@@ -63,7 +63,7 @@ def classify_topic(*, title: str, description: str = "") -> tuple[str | None, st
     combined = f"{title}\n{description}"
 
     if MEDIA_RE.search(combined):
-        return None, "影视音乐"
+        return "media", "影视音乐"
     if SHORT_VIDEO_RE.search(title):
         return None, "短视频运营"
     if EBOOK_RE.search(title) and not AI_RE.search(title):
@@ -78,4 +78,4 @@ def classify_topic(*, title: str, description: str = "") -> tuple[str | None, st
     if DISCOVER_RE.search(title):
         return "discover", "发现"
 
-    return None, "其他"
+    return "other", "其它"
