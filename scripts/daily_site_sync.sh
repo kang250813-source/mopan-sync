@@ -35,6 +35,9 @@ if [[ ! -d "$SITE_ROOT/.venv" ]]; then
   "$SITE_ROOT/.venv/bin/pip" install -q -r "$SITE_ROOT/requirements.txt"
 fi
 
+log "[0/7] 确保 site.db 已从 data/export 初始化..."
+"$SITE_ROOT/.venv/bin/python" "$SITE_ROOT/scripts/bootstrap_site_db.py"
+
 after_date="$(python3 - <<'PY'
 from datetime import datetime, timedelta, timezone
 days = int(__import__("os").environ.get("CRAWL_DAYS", "14"))

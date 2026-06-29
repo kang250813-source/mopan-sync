@@ -92,10 +92,23 @@ def main() -> int:
     channel_counts["drama"] = drama_total
     print(f"  drama: {drama_total}")
 
-    exported_at = datetime.now(timezone.utc).isoformat()
     out_dir = site_root / "data"
     export_dir = out_dir / "export"
     export_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = export_dir / "manifest.json"
+    if manifest_path.is_file():
+        old_counts = json.loads(manifest_path.read_text(encoding="utf-8")).get("channel_counts") or {}
+        old_total = sum(int(v) for v in old_counts.values())
+        new_total = sum(channel_counts.values())
+        if old_total > 500 and new_total < old_total * 0.5:
+            print(
+                f"ERROR: export would shrink site data {old_total} -> {new_total}; "
+                "seed site.db from data/export before running daily sync",
+                file=sys.stderr,
+            )
+            return 1
+
+    exported_at = datetime.now(timezone.utc).isoformat()
 
     for channel in resource_channels:
         channel_path = export_dir / f"{channel}.json"
