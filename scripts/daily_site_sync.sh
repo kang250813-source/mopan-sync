@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SITE_ROOT="${SITE_ROOT:-$HOME/mopan-site}"
+export SITE_ROOT
 CRAWL_DAYS="${CRAWL_DAYS:-14}"
 IMPORT_DAYS="${IMPORT_DAYS:-14}"
 LINUXDO_PAGES="${LINUXDO_PAGES:-5}"

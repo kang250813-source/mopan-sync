@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,7 +39,7 @@ def main() -> int:
     if not in_path.is_absolute():
         in_path = ROOT / in_path
 
-    site_root = Path(config["site"]["root"]).expanduser()
+    site_root = Path(os.environ.get("SITE_ROOT") or config["site"]["root"]).expanduser()
     payload = json.loads(in_path.read_text(encoding="utf-8"))
     topics = list(payload.get("topics") or [])
     for row in topics:
