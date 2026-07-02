@@ -55,10 +55,12 @@ log "[2/7] 导入 ahhhhfs 到发现频道（近 ${IMPORT_DAYS} 天）..."
 .venv/bin/python transfer/import_articles.py --days "$IMPORT_DAYS"
 
 log "[3/7] 抓取 LINUX DO RSS（${LINUXDO_PAGES} 页）..."
-.venv/bin/python scraper/linuxdo.py --pages "$LINUXDO_PAGES" --delay "$LINUXDO_DELAY" --merge
-
-log "[4/7] 导入 LINUX DO 网盘资源..."
-.venv/bin/python transfer/import_linuxdo.py
+if ! .venv/bin/python scraper/linuxdo.py --pages "$LINUXDO_PAGES" --delay "$LINUXDO_DELAY" --merge; then
+  log "LINUX DO 抓取失败，跳过导入（ahhhhfs 与其它步骤继续）"
+else
+  log "[4/7] 导入 LINUX DO 网盘资源..."
+  .venv/bin/python transfer/import_linuxdo.py
+fi
 
 log "[5/7] 导出全站数据..."
 .venv/bin/python transfer/export_site_data.py

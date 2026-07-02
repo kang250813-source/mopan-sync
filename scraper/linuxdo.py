@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -27,11 +28,136 @@ USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
+DEFAULT_HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "application/rss+xml, application/xml, text/xml, */*",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+}
 
 
 def load_config() -> dict:
     with (ROOT / "config.yaml").open(encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def _linuxdo_cfg(config: dict | None = None) -> dict:
+    cfg = (config or load_config()).get("linuxdo", {})
+    return cfg if isinstance(cfg, dict) else {}
+
+
+def _proxy_url(linuxdo: dict) -> str | None:
+    for key in ("proxy", "https_proxy", "http_proxy"):
+        val = (linuxdo.get(key) or os.environ.get(key.upper()) or "").strip()
+        if val:
+            return val
+    return os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY") or None
+
+
+def _load_cookie_header(linuxdo: dict) -> str:
+    raw = (linuxdo.get("cookie") or os.environ.get("LINUXDO_COOKIE") or "").strip()
+    if raw:
+        return raw
+    cookie_file = (linuxdo.get("cookie_file") or os.environ.get("LINUXDO_COOKIE_FILE") or "").strip()
+    if not cookie_file:
+        return ""
+    path = Path(cookie_file).expanduser()
+    if not path.is_file():
+        return ""
+    lines = [ln.strip() for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if not lines:
+        return ""
+    if lines[0].lower().startswith("# netscape") or "\t" in lines[0]:
+        parts: list[str] = []
+        for line in lines:
+            if line.startswith("#"):
+                continue
+            cols = line.split("\t")
+            if len(cols) >= 7:
+                parts.append(f"{cols[5]}={cols[6]}")
+        return "; ".join(parts)
+    return "; ".join(lines)
+
+
+def fetch_rss_http(url: str, *, config: dict | None = None) -> tuple[bytes, int, str]:
+    """Fetch RSS bytes. Prefer curl_cffi (Cloudflare bypass), then httpx."""
+    linuxdo = _linuxdo_cfg(config)
+    headers = dict(DEFAULT_HEADERS)
+    cookie = _load_cookie_header(linuxdo)
+    if cookie:
+        headers["Cookie"] = cookie
+    proxy = _proxy_url(linuxdo)
+    impersonate = (linuxdo.get("impersonate") or "chrome131").strip()
+    timeout = float(linuxdo.get("timeout_seconds") or 30)
+    retries = int(linuxdo.get("max_retries") or 3)
+    last_error = ""
+
+    for attempt in range(1, retries + 1):
+        try:
+            from curl_cffi import requests as cffi_requests
+
+            kwargs: dict[str, Any] = {
+                "headers": headers,
+                "timeout": timeout,
+                "impersonate": impersonate,
+                "allow_redirects": True,
+            }
+            if proxy:
+                kwargs["proxy"] = proxy
+            resp = cffi_requests.get(url, **kwargs)
+            body = resp.content or b""
+            ctype = (resp.headers.get("content-type") or "").lower()
+            if resp.status_code == 200 and (
+                b"<rss" in body[:4000] or b"<feed" in body[:4000] or "xml" in ctype
+            ):
+                return body, resp.status_code, "curl_cffi"
+            last_error = f"curl_cffi status={resp.status_code} ctype={ctype[:40]}"
+        except ImportError:
+            last_error = "curl_cffi not installed"
+            break
+        except Exception as exc:  # noqa: BLE001
+            last_error = f"curl_cffi {type(exc).__name__}: {exc}"
+
+        if attempt < retries:
+            wait = min(5 * attempt, 20)
+            print(f"  RSS 重试 {attempt}/{retries}（{last_error}），{wait}s 后重试…", flush=True)
+            time.sleep(wait)
+
+    import httpx
+
+    for attempt in range(1, retries + 1):
+        try:
+            with httpx.Client(
+                headers=headers,
+                timeout=timeout,
+                follow_redirects=True,
+                proxy=proxy,
+            ) as client:
+                resp = client.get(url)
+            body = resp.content or b""
+            ctype = (resp.headers.get("content-type") or "").lower()
+            if resp.status_code == 200 and (
+                b"<rss" in body[:4000] or b"<feed" in body[:4000] or "xml" in ctype
+            ):
+                return body, resp.status_code, "httpx"
+            last_error = f"httpx status={resp.status_code} ctype={ctype[:40]}"
+        except Exception as exc:  # noqa: BLE001
+            last_error = f"httpx {type(exc).__name__}: {exc}"
+        if attempt < retries:
+            wait = min(5 * attempt, 20)
+            print(f"  RSS 重试 {attempt}/{retries}（{last_error}），{wait}s 后重试…", flush=True)
+            time.sleep(wait)
+
+    raise RuntimeError(f"RSS 请求失败：{last_error or 'unknown error'}")
+
+
+def fetch_rss_page(base_url: str, page: int, *, config: dict | None = None) -> feedparser.FeedParserDict:
+    url = base_url if page <= 1 else f"{base_url}?page={page}"
+    body, status, via = fetch_rss_http(url, config=config)
+    if page == 1:
+        print(f"  RSS 获取成功 via {via} status={status}", flush=True)
+    feed = feedparser.parse(body)
+    feed.status = status
+    return feed
 
 
 def parse_published(raw: str) -> datetime | None:
@@ -91,11 +217,6 @@ def parse_entry(entry: Any, *, require_pan: bool = False) -> dict | None:
     }
 
 
-def fetch_rss_page(base_url: str, page: int) -> feedparser.FeedParserDict:
-    url = base_url if page <= 1 else f"{base_url}?page={page}"
-    return feedparser.parse(url, agent=USER_AGENT)
-
-
 def crawl_category(
     *,
     rss_url: str,
@@ -105,6 +226,7 @@ def crawl_category(
     require_pan: bool = False,
     retry_429: float = 60.0,
     min_published: datetime | None = None,
+    config: dict | None = None,
 ) -> tuple[list[dict], dict[str, int]]:
     stats = {
         "pages": 0,
@@ -123,7 +245,7 @@ def crawl_category(
         if max_pages > 0 and page > max_pages:
             break
 
-        feed = fetch_rss_page(rss_url, page)
+        feed = fetch_rss_page(rss_url, page, config=config)
         status = int(getattr(feed, "status", 0) or 0)
         entries = list(feed.entries or [])
 
@@ -139,7 +261,7 @@ def crawl_category(
 
         if not entries:
             if page == 1:
-                raise RuntimeError(f"RSS 请求失败 status={status}，请稍后重试")
+                raise RuntimeError(f"RSS 解析失败 status={status}，未拿到任何条目")
             break
 
         new_count = 0
@@ -239,7 +361,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    config = load_config()
+    config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
     linuxdo = config.get("linuxdo", {})
     rss_url = linuxdo.get("rss_url", f"https://linux.do{DEFAULT_CATEGORY}.rss")
     out_path = ROOT / linuxdo.get("data_path", "data/linuxdo_topics.json")
@@ -262,6 +384,7 @@ def main() -> int:
         stop_on_dup=args.pages == 0,
         require_pan=args.require_pan,
         min_published=min_published,
+        config=config,
     )
 
     if args.merge and out_path.exists():

@@ -60,6 +60,9 @@ linuxdo:
   data_path: "data/linuxdo_topics.json"
   page_delay_seconds: 12
   max_age_days: 730   # 只抓/保留近两年
+  impersonate: chrome131   # curl_cffi 浏览器指纹，绕过 Cloudflare
+  # cookie_file: "data/linuxdo_cookies.txt"  # 可选：浏览器导出的 Cookie 备用
+  # proxy: "http://127.0.0.1:7890"           # 可选；也可用环境变量 HTTPS_PROXY
 
 # ahhhhfs 本地收件箱（每日抓取浏览，手动 import 上站）
 ahhhhfs:
