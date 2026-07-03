@@ -78,6 +78,12 @@ def _load_cookie_header(linuxdo: dict) -> str:
     return "; ".join(lines)
 
 
+def _retry_wait(status: int, attempt: int) -> float:
+    if status == 429:
+        return min(60.0 * attempt, 180.0)
+    return min(5.0 * attempt, 20.0)
+
+
 def fetch_rss_http(url: str, *, config: dict | None = None) -> tuple[bytes, int, str]:
     """Fetch RSS bytes. Prefer curl_cffi (Cloudflare bypass), then httpx."""
     linuxdo = _linuxdo_cfg(config)
@@ -87,9 +93,10 @@ def fetch_rss_http(url: str, *, config: dict | None = None) -> tuple[bytes, int,
         headers["Cookie"] = cookie
     proxy = _proxy_url(linuxdo)
     impersonate = (linuxdo.get("impersonate") or "chrome131").strip()
-    timeout = float(linuxdo.get("timeout_seconds") or 30)
-    retries = int(linuxdo.get("max_retries") or 3)
+    timeout = float(linuxdo.get("timeout_seconds") or 45)
+    retries = int(linuxdo.get("max_retries") or 6)
     last_error = ""
+    saw_429 = False
 
     for attempt in range(1, retries + 1):
         try:
@@ -111,6 +118,8 @@ def fetch_rss_http(url: str, *, config: dict | None = None) -> tuple[bytes, int,
             ):
                 return body, resp.status_code, "curl_cffi"
             last_error = f"curl_cffi status={resp.status_code} ctype={ctype[:40]}"
+            if resp.status_code == 429:
+                saw_429 = True
         except ImportError:
             last_error = "curl_cffi not installed"
             break
@@ -118,34 +127,35 @@ def fetch_rss_http(url: str, *, config: dict | None = None) -> tuple[bytes, int,
             last_error = f"curl_cffi {type(exc).__name__}: {exc}"
 
         if attempt < retries:
-            wait = min(5 * attempt, 20)
-            print(f"  RSS 重试 {attempt}/{retries}（{last_error}），{wait}s 后重试…", flush=True)
+            wait = _retry_wait(429 if saw_429 else 0, attempt)
+            print(f"  RSS 重试 {attempt}/{retries}（{last_error}），{wait:.0f}s 后重试…", flush=True)
             time.sleep(wait)
 
-    import httpx
+    if not saw_429:
+        import httpx
 
-    for attempt in range(1, retries + 1):
-        try:
-            with httpx.Client(
-                headers=headers,
-                timeout=timeout,
-                follow_redirects=True,
-                proxy=proxy,
-            ) as client:
-                resp = client.get(url)
-            body = resp.content or b""
-            ctype = (resp.headers.get("content-type") or "").lower()
-            if resp.status_code == 200 and (
-                b"<rss" in body[:4000] or b"<feed" in body[:4000] or "xml" in ctype
-            ):
-                return body, resp.status_code, "httpx"
-            last_error = f"httpx status={resp.status_code} ctype={ctype[:40]}"
-        except Exception as exc:  # noqa: BLE001
-            last_error = f"httpx {type(exc).__name__}: {exc}"
-        if attempt < retries:
-            wait = min(5 * attempt, 20)
-            print(f"  RSS 重试 {attempt}/{retries}（{last_error}），{wait}s 后重试…", flush=True)
-            time.sleep(wait)
+        for attempt in range(1, retries + 1):
+            try:
+                with httpx.Client(
+                    headers=headers,
+                    timeout=timeout,
+                    follow_redirects=True,
+                    proxy=proxy,
+                ) as client:
+                    resp = client.get(url)
+                body = resp.content or b""
+                ctype = (resp.headers.get("content-type") or "").lower()
+                if resp.status_code == 200 and (
+                    b"<rss" in body[:4000] or b"<feed" in body[:4000] or "xml" in ctype
+                ):
+                    return body, resp.status_code, "httpx"
+                last_error = f"httpx status={resp.status_code} ctype={ctype[:40]}"
+            except Exception as exc:  # noqa: BLE001
+                last_error = f"httpx {type(exc).__name__}: {exc}"
+            if attempt < retries:
+                wait = _retry_wait(0, attempt)
+                print(f"  RSS 重试 {attempt}/{retries}（{last_error}），{wait:.0f}s 后重试…", flush=True)
+                time.sleep(wait)
 
     raise RuntimeError(f"RSS 请求失败：{last_error or 'unknown error'}")
 
