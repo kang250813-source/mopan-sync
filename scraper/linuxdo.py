@@ -7,12 +7,15 @@ import argparse
 import json
 import os
 import re
+import socket
 import sys
 import time
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import feedparser
 import yaml
@@ -45,12 +48,41 @@ def _linuxdo_cfg(config: dict | None = None) -> dict:
     return cfg if isinstance(cfg, dict) else {}
 
 
+def _proxy_reachable(proxy: str, *, timeout: float = 1.5) -> bool:
+    parsed = urlparse(proxy if "://" in proxy else f"http://{proxy}")
+    host = parsed.hostname
+    if not host:
+        return False
+    port = parsed.port
+    if not port:
+        port = 1080 if parsed.scheme.startswith("socks") else 7890
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 def _proxy_url(linuxdo: dict) -> str | None:
-    for key in ("proxy", "https_proxy", "http_proxy"):
-        val = (linuxdo.get(key) or os.environ.get(key.upper()) or "").strip()
-        if val:
-            return val
-    return os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY") or None
+    use_proxy = str(linuxdo.get("use_proxy", "auto")).lower()
+    if use_proxy in {"0", "false", "never", "off", "no"}:
+        return None
+
+    candidates: list[str] = []
+    explicit = (linuxdo.get("proxy") or "").strip()
+    if explicit:
+        candidates.append(explicit)
+    if use_proxy in {"auto", "true", "always", "on", "yes", "1", ""}:
+        for key in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"):
+            val = (os.environ.get(key) or "").strip()
+            if val and val not in candidates:
+                candidates.append(val)
+
+    for proxy in candidates:
+        if _proxy_reachable(proxy):
+            return proxy
+        print(f"  代理不可用，已跳过: {proxy}", flush=True)
+    return None
 
 
 def _load_cookie_header(linuxdo: dict) -> str:
@@ -78,6 +110,25 @@ def _load_cookie_header(linuxdo: dict) -> str:
     return "; ".join(lines)
 
 
+_PROXY_ENV_KEYS = (
+    "http_proxy",
+    "https_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "all_proxy",
+    "ALL_PROXY",
+)
+
+
+@contextmanager
+def _without_proxy_env():
+    saved = {k: os.environ.pop(k) for k in _PROXY_ENV_KEYS if k in os.environ}
+    try:
+        yield
+    finally:
+        os.environ.update(saved)
+
+
 def _retry_wait(status: int, attempt: int) -> float:
     if status == 429:
         return min(60.0 * attempt, 180.0)
@@ -97,6 +148,10 @@ def fetch_rss_http(url: str, *, config: dict | None = None) -> tuple[bytes, int,
     retries = int(linuxdo.get("max_retries") or 6)
     last_error = ""
     saw_429 = False
+    if proxy:
+        print(f"  使用代理: {proxy}", flush=True)
+    else:
+        print("  未使用代理（直连 linux.do）", flush=True)
 
     for attempt in range(1, retries + 1):
         try:
@@ -110,7 +165,9 @@ def fetch_rss_http(url: str, *, config: dict | None = None) -> tuple[bytes, int,
             }
             if proxy:
                 kwargs["proxy"] = proxy
-            resp = cffi_requests.get(url, **kwargs)
+            ctx = nullcontext() if proxy else _without_proxy_env()
+            with ctx:
+                resp = cffi_requests.get(url, **kwargs)
             body = resp.content or b""
             ctype = (resp.headers.get("content-type") or "").lower()
             if resp.status_code == 200 and (
@@ -141,6 +198,7 @@ def fetch_rss_http(url: str, *, config: dict | None = None) -> tuple[bytes, int,
                     timeout=timeout,
                     follow_redirects=True,
                     proxy=proxy,
+                    trust_env=bool(proxy),
                 ) as client:
                     resp = client.get(url)
                 body = resp.content or b""

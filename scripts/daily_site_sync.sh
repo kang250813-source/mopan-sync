@@ -16,6 +16,21 @@ LOG_TAG="[daily-site-sync $(date '+%F %T')]"
 
 log() { echo "$LOG_TAG $*"; }
 
+# 环境变量里常设 127.0.0.1:7890，但 Clash 未启动会导致 LINUX DO 立刻失败
+if [[ -n "${HTTPS_PROXY:-${https_proxy:-}}" ]]; then
+  _proxy_url="${HTTPS_PROXY:-${https_proxy:-}}"
+  _proxy_host_port="${_proxy_url#*://}"
+  _proxy_host="${_proxy_host_port%%:*}"
+  _proxy_port="${_proxy_host_port##*:}"
+  _proxy_port="${_proxy_port%%/*}"
+  if [[ "$_proxy_host" == "127.0.0.1" || "$_proxy_host" == "localhost" ]]; then
+    if ! timeout 1 bash -c "echo >/dev/tcp/${_proxy_host}/${_proxy_port}" 2>/dev/null; then
+      log "本地代理 ${_proxy_url} 未启动，清除代理环境变量后重试 LINUX DO"
+      unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY
+    fi
+  fi
+fi
+
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   log "已有同步任务在运行，跳过"
