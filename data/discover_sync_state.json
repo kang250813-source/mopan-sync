@@ -1,6 +1,8 @@
 {
-  "last_sync": "2026-06-15T06:23:16Z",
-  "crawl_after": "2026-06-01T00:00:00",
+  "last_sync": "2026-07-03T07:03:56Z",
+  "crawl_after": "2026-06-19T00:00:00",
   "crawl_days": 14,
-  "import_days": 14
+  "import_days": 14,
+  "linuxdo_pages": 3,
+  "pipeline": "daily_site_sync"
 }
