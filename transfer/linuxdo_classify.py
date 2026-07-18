@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from html import unescape
 
 MEDIA_RE = re.compile(
     r"影视|电影|动漫|电视剧|美剧|韩剧|国漫|纪录片|综艺|番剧|"
@@ -36,6 +37,10 @@ DISCOVER_RE = re.compile(
 EBOOK_RE = re.compile(r"电子书|小说合集|有声读物|杂志|2000册|书籍分享", re.I)
 
 BUSINESS_RE = re.compile(r"创业|有术|商业|变现|群响|任推邦", re.I)
+PAN_PASSWORD_RE = re.compile(
+    r"(?:提取码|访问码|密码|口令)\s*(?:为|是)?\s*[:：=]?\s*([A-Za-z0-9]{4,16})",
+    re.I,
+)
 
 
 def pick_pan_url(description: str) -> tuple[str, str] | None:
@@ -56,6 +61,16 @@ def pick_pan_url(description: str) -> tuple[str, str] | None:
     if aliyun:
         return aliyun[0].split("?")[0], "aliyun"
     return None
+
+
+def pick_pan_password(description: str) -> str:
+    """Extract an access code supplied beside a cloud-drive link."""
+    text = unescape(description or "")
+    baidu = re.search(r"[?&]pwd=([A-Za-z0-9]{4,16})", text, re.I)
+    if baidu:
+        return baidu.group(1)
+    match = PAN_PASSWORD_RE.search(text)
+    return match.group(1) if match else ""
 
 
 def classify_topic(*, title: str, description: str = "") -> tuple[str | None, str]:

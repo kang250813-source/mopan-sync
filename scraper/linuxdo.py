@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from transfer.linuxdo_classify import classify_topic, pick_pan_url
+from transfer.linuxdo_classify import classify_topic, pick_pan_password, pick_pan_url
 
 DEFAULT_CATEGORY = "/c/resource/cloud-asset/94"
 USER_AGENT = (
@@ -266,6 +266,7 @@ def parse_entry(entry: Any, *, require_pan: bool = False) -> dict | None:
         pan_url, pan_type = "", ""
     else:
         pan_url, pan_type = pan
+    pan_password = pick_pan_password(description) if pan_url else ""
 
     channel, category = classify_topic(title=title, description=description)
     published = entry.get("published") or entry.get("updated") or ""
@@ -275,6 +276,7 @@ def parse_entry(entry: Any, *, require_pan: bool = False) -> dict | None:
         "title": title,
         "link": link,
         "pan_url": pan_url,
+        "pan_password": pan_password,
         "pan_type": pan_type,
         "channel": channel,
         "category": category,

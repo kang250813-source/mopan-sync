@@ -80,6 +80,7 @@ def main() -> int:
         result = upsert_resource(
             title=row["title"],
             pan_url=row["pan_url"],
+            pan_password=row.get("pan_password", ""),
             pan_type=row.get("pan_type", "quark"),
             category=row.get("category") or "网盘资源",
             excerpt=excerpt,
